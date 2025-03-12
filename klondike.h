@@ -13,6 +13,7 @@
 #define HIDDEN_CARDS_MAX 21
 
 #define AUTOCOMPLETE_INTERVAL 200 // milliseconds
+
 struct Klondike_Stock {
     // stock and waste
     struct Card * stock; // starts out at 24 and only goes down
@@ -32,6 +33,18 @@ struct Klondike_Tableau {
     struct Tableau_Stack tab_stack[TABLEAU_STACK_QUANTITY];
 };
 
+void delay(unsigned int period_in_ms) {
+    clock_t ticks;
+    clock_t ticks2;
+    clock_t clocks_per_ms = CLOCKS_PER_SEC/1000;
+    clock_t clocks_per_period = clocks_per_ms * period_in_ms;
+    ticks = clock();
+    ticks2 = ticks;
+    while ( (ticks2 / clocks_per_period) - (ticks / clocks_per_period) < 1 ) {
+        ticks2 = clock();
+    }
+    return;
+}
 int get_stack_size(struct Card * the_stack) {
     int i = 0;
     int card_count = 0;
@@ -462,8 +475,9 @@ void autocomplete(struct Klondike_Tableau * the_tableau, struct Klondike_Stock *
             }
         }
         desired_value = lowest_foundations + 1;
-        if (desired_value == VALUE_KING && desired_suit == SUIT_HEARTS) {
+        if (lowest_foundations == VALUE_KING) {
             done = 1;
+            break;
         }
         for (i = 0; i < TABLEAU_STACK_QUANTITY; i++) {
             tab_stack_size[i] = get_stack_size(the_tableau->tab_stack[i].stack_card);
@@ -502,7 +516,7 @@ void autocomplete(struct Klondike_Tableau * the_tableau, struct Klondike_Stock *
             }
         }
         // post-move
-        sleep(1);
+        delay(AUTOCOMPLETE_INTERVAL);
         display_klondike_interface(the_stock,the_foundations,the_tableau);
     }   
     return;
@@ -625,7 +639,6 @@ int klondike(struct Deck * the_deck) {
 }
 
 // NEXT STEPS:
-// autocomplete
 // undo
 // GUI
-// 
+// freecell
