@@ -32,6 +32,11 @@ struct Klondike_Tableau {
     // the main seven stacks
     struct Tableau_Stack tab_stack[TABLEAU_STACK_QUANTITY];
 };
+struct Klondike_Solitaire {
+    struct Klondike_Stock * draw;
+    struct Klondike_Foundations * foundations;
+    struct Klondike_Tableau * tableau;
+};
 
 void delay(unsigned int period_in_ms) {
     clock_t ticks;
@@ -54,100 +59,42 @@ int get_stack_size(struct Card * the_stack) {
     }
     return card_count;
 }
-struct Klondike_Tableau * init_tableau(struct Deck * the_deck) {
-    struct Klondike_Tableau * the_tableau = malloc(TABLEAU_STACK_QUANTITY*(TABLEAU_STACK_MAX)*sizeof(struct Card));
+
+struct Klondike_Solitaire * init_klondike(struct Deck * deck) {
+    struct Klondike_Solitaire * solitaire = malloc(sizeof(struct Klondike_Solitaire));
+
+    // initializes stock and waste stacks
+    solitaire->draw = malloc(sizeof(struct Klondike_Stock));
+    solitaire->draw->stock = malloc(STOCK_STACK_MAX*sizeof(struct Card));
+    solitaire->draw->waste = malloc(WASTE_STACK_MAX*sizeof(struct Card));
     int i;
+    int stock_index = 0;
+    for(i = DECK_SIZE - STOCK_STACK_MAX; i < DECK_SIZE; i++) {
+        solitaire->draw->stock[stock_index++] = deck->deck_card[i];
+    }
+
+    // initialize foundations
+    solitaire->foundations = malloc(sizeof(struct Klondike_Foundations));
+
+    solitaire->foundations->stack[SUIT_HEARTS  ]    = malloc(FOUNDATIONS_STACK_MAX*sizeof(struct Card));
+    solitaire->foundations->stack[SUIT_SPADES  ]    = malloc(FOUNDATIONS_STACK_MAX*sizeof(struct Card));
+    solitaire->foundations->stack[SUIT_DIAMONDS]    = malloc(FOUNDATIONS_STACK_MAX*sizeof(struct Card));
+    solitaire->foundations->stack[SUIT_CLUBS   ]    = malloc(FOUNDATIONS_STACK_MAX*sizeof(struct Card));
+
+    // initialize tableau
+    solitaire->tableau = malloc(TABLEAU_STACK_QUANTITY*(TABLEAU_STACK_MAX)*sizeof(struct Card));
     int j;
     int card_index = 0;
     for (i = 0; i < TABLEAU_STACK_QUANTITY; i++) { // bottom to top
         for (j = 0; j < TABLEAU_STACK_QUANTITY; j++) { // left to right
             if (i <= j) {
-                the_tableau->tab_stack[j].stack_card[i] = the_deck->deck_card[card_index++];
+                solitaire->tableau->tab_stack[j].stack_card[i] = deck->deck_card[card_index++];
                 // traditional dealing order
             }
         }
-        the_tableau->tab_stack[i].hidden_cards = i; // hide i cards where i is the ith stack (starting with 0)
+        solitaire->tableau->tab_stack[i].hidden_cards = i; // hide i cards where i is the ith stack (starting with 0)
     }
-    return the_tableau;
-}
-void display_tableau(struct Klondike_Tableau * tab) {
-    int stack_size[TABLEAU_STACK_QUANTITY]; // an array of the sizes of the tableau stacks
-    int largest_stack_size;
-    int hide = 1; // debugging flag for the tableau (set to 1 to see full tableau)
-    int i;
-    int j;
-    // initial tableau template (displayed cards are index 0)
-    //                         C6 
-    //                     C5  XX 
-    //                 C4  XX  XX 
-    //             C3  XX  XX  XX 
-    //         C2  XX  XX  XX  XX 
-    //     C1  XX  XX  XX  XX  XX 
-    // C0  XX  XX  XX  XX  XX  XX
-    //
-    for(i = 0; i < TABLEAU_STACK_QUANTITY; i++) { // left to right
-        // initialize stack_size array
-        stack_size[i] = get_stack_size(tab->tab_stack[i].stack_card);
-        if (i > 0) {
-            if (stack_size[i] > largest_stack_size) largest_stack_size = stack_size[i];
-        }
-        else {
-            largest_stack_size = stack_size[i];
-        }
-    }
-    // actually displaying the tableau
-    for(j = largest_stack_size - 1; j >= 0; j--) { // TOP TO BOTTOM
-        for(i = 0; i < TABLEAU_STACK_QUANTITY; i++) { // LEFT TO RIGHT
-            if (tab->tab_stack[i].stack_card[j].value == 0) {
-                printf("    "); // no card at this level
-            }
-            else if ( (j >= tab->tab_stack[i].hidden_cards) || hide == 0 ) { // only display cards above the number of hidden cards
-                printf(" ");
-                identify_card(tab->tab_stack[i].stack_card[j]);
-                printf(" ");
-            }
-            else {
-                printf(" XX ");
-            }
-        }
-        printf("\n");
-    }
-    return;
-}
-struct Klondike_Stock * init_stock(struct Deck * the_deck) {
-    // initializes stock and waste stacks
-    struct Klondike_Stock * the_stock = malloc(sizeof(struct Klondike_Stock));
-    the_stock->stock = malloc(STOCK_STACK_MAX*sizeof(struct Card));
-    the_stock->waste = malloc(WASTE_STACK_MAX*sizeof(struct Card));
-    int i;
-    int stock_index = 0;
-    for(i = DECK_SIZE - STOCK_STACK_MAX; i < DECK_SIZE; i++) {
-        the_stock->stock[stock_index++] = the_deck->deck_card[i];
-    }
-    return the_stock;
-}
-void display_stock(struct Klondike_Stock * the_stock) {
-    printf("\n");
-    int stock_stack_size = get_stack_size(the_stock->stock);
-    if (stock_stack_size == 0) {
-        // stock is empty
-        printf(" [] ");
-    }
-    else {
-        printf(" XX ");
-    }
-    int waste_stack_size = get_stack_size(the_stock->waste);
-    int waste_index = waste_stack_size - 1;
-    if (waste_stack_size == 0) {
-        printf("    ");
-    }
-    else {
-        printf(" ");
-        identify_card(the_stock->waste[waste_index]);
-        printf(" ");
-    }
-    printf("    ");
-    return;
+    return solitaire;
 }
 void unspool_stock(struct Klondike_Stock * the_stock) {
     // for debugging purposes
@@ -174,29 +121,87 @@ void unspool_stock(struct Klondike_Stock * the_stock) {
     }
     return;
 }
-struct Klondike_Foundations * init_foundations() {
-    struct Klondike_Foundations * the_foundations = malloc(sizeof(struct Klondike_Foundations));
+void display_klondike(struct Klondike_Solitaire * solitaire) {
+    // display stock
+    printf("\n");
+    int stock_stack_size = get_stack_size(solitaire->draw->stock);
+    if (stock_stack_size == 0) {
+        // stock is empty
+        printf(" [] ");
+    }
+    else {
+        printf(" XX ");
+    }
+    int waste_stack_size = get_stack_size(solitaire->draw->waste);
+    int waste_index = waste_stack_size - 1;
+    if (waste_stack_size == 0) {
+        printf("    ");
+    }
+    else {
+        printf(" ");
+        identify_card(solitaire->draw->waste[waste_index]);
+        printf(" ");
+    }
+    printf("    ");
 
-    the_foundations->stack[SUIT_HEARTS  ]    = malloc(FOUNDATIONS_STACK_MAX*sizeof(struct Card));
-    the_foundations->stack[SUIT_SPADES  ]    = malloc(FOUNDATIONS_STACK_MAX*sizeof(struct Card));
-    the_foundations->stack[SUIT_DIAMONDS]    = malloc(FOUNDATIONS_STACK_MAX*sizeof(struct Card));
-    the_foundations->stack[SUIT_CLUBS   ]    = malloc(FOUNDATIONS_STACK_MAX*sizeof(struct Card));
-
-    return the_foundations;
-}
-void display_foundations(struct Klondike_Foundations * the_foundations) {
+    // display foundations
     int i;
     for (i = 0; i < FOUNDATIONS_STACK_QUANTITY; i++) {
-        int size = get_stack_size(the_foundations->stack[i]);
+        int size = get_stack_size(solitaire->foundations->stack[i]);
         printf(" ");
         if (size == 0) {
             printf("[]");
         }
         else {
-        identify_card(the_foundations->stack[i][size - 1]);
+        identify_card(solitaire->foundations->stack[i][size - 1]);
         }
         printf(" ");
     }
+    printf("\n\n");
+
+
+    // display tableau
+    int stack_size[TABLEAU_STACK_QUANTITY]; // an array of the sizes of the tableau stacks
+    int largest_stack_size;
+    int hide = 1; // debugging flag for the tableau (set to 1 to see full tableau)
+    int j;
+    // initial tableau template (displayed cards are index 0)
+    //                         C6 
+    //                     C5  XX 
+    //                 C4  XX  XX 
+    //             C3  XX  XX  XX 
+    //         C2  XX  XX  XX  XX 
+    //     C1  XX  XX  XX  XX  XX 
+    // C0  XX  XX  XX  XX  XX  XX
+    //
+    for(i = 0; i < TABLEAU_STACK_QUANTITY; i++) { // left to right
+        // initialize stack_size array
+        stack_size[i] = get_stack_size(solitaire->tableau->tab_stack[i].stack_card);
+        if (i > 0) {
+            if (stack_size[i] > largest_stack_size) largest_stack_size = stack_size[i];
+        }
+        else {
+            largest_stack_size = stack_size[i];
+        }
+    }
+    // actually displaying the tableau
+    for(j = largest_stack_size - 1; j >= 0; j--) { // TOP TO BOTTOM
+        for(i = 0; i < TABLEAU_STACK_QUANTITY; i++) { // LEFT TO RIGHT
+            if (solitaire->tableau->tab_stack[i].stack_card[j].value == 0) {
+                printf("    "); // no card at this level
+            }
+            else if ( (j >= solitaire->tableau->tab_stack[i].hidden_cards) || hide == 0 ) { // only display cards above the number of hidden cards
+                printf(" ");
+                identify_card(solitaire->tableau->tab_stack[i].stack_card[j]);
+                printf(" ");
+            }
+            else {
+                printf(" XX ");
+            }
+        }
+        printf("\n");
+    }
+    printf("\n\n");
     return;
 }
 void draw_stock(struct Klondike_Stock * the_stock) {
@@ -227,14 +232,6 @@ void draw_stock(struct Klondike_Stock * the_stock) {
         // invalidate card
         the_stock->stock[stock_index].value = 0;
     }
-    return;
-}
-void display_klondike_interface(struct Klondike_Stock * the_stock, struct Klondike_Foundations * the_foundations, struct Klondike_Tableau * the_tableau) {
-    display_stock(the_stock);
-    display_foundations(the_foundations);
-    printf("\n\n");
-    display_tableau(the_tableau);
-    printf("\n\n");
     return;
 }
 int get_suit(struct Card source_card) {
@@ -452,7 +449,7 @@ void from_foundations_move(struct Klondike_Foundations * the_foundations, int su
         return;
     }
 }
-void autocomplete(struct Klondike_Tableau * the_tableau, struct Klondike_Stock * the_stock, struct Klondike_Foundations * the_foundations) {
+void autocomplete(struct Klondike_Solitaire * solitaire) {
     int i;
     int tab_stack_size[TABLEAU_STACK_QUANTITY];
     int foundations_stack_size[FOUNDATIONS_STACK_QUANTITY];
@@ -464,7 +461,7 @@ void autocomplete(struct Klondike_Tableau * the_tableau, struct Klondike_Stock *
     while (!done) {
         skip = 0;
         for (i = 0; i < FOUNDATIONS_STACK_QUANTITY; i++) {
-            foundations_stack_size[i] = get_stack_size(the_foundations->stack[i]);
+            foundations_stack_size[i] = get_stack_size(solitaire->foundations->stack[i]);
             if (i == 0) {
                 lowest_foundations = foundations_stack_size[i];
                 desired_suit = i;
@@ -480,34 +477,34 @@ void autocomplete(struct Klondike_Tableau * the_tableau, struct Klondike_Stock *
             break;
         }
         for (i = 0; i < TABLEAU_STACK_QUANTITY; i++) {
-            tab_stack_size[i] = get_stack_size(the_tableau->tab_stack[i].stack_card);
+            tab_stack_size[i] = get_stack_size(solitaire->tableau->tab_stack[i].stack_card);
             if (tab_stack_size[i] == 0) {
                 // don't bother looking at empty stacks
                 continue;
             }
-            if (get_value(the_tableau->tab_stack[i].stack_card[tab_stack_size[i] - 1]) == desired_value &&
-                get_suit(the_tableau->tab_stack[i].stack_card[tab_stack_size[i] - 1])  == desired_suit ) {
+            if (get_value(solitaire->tableau->tab_stack[i].stack_card[tab_stack_size[i] - 1]) == desired_value &&
+                 get_suit(solitaire->tableau->tab_stack[i].stack_card[tab_stack_size[i] - 1])  == desired_suit ) {
                     // desired card located in foundations
-                    to_foundations_move(the_tableau->tab_stack[i].stack_card,the_foundations);
+                    to_foundations_move(solitaire->tableau->tab_stack[i].stack_card,solitaire->foundations);
                     skip = 1;
                     break;
                 }
         }
         while (!skip) {
-            int stock_stack_size = get_stack_size(the_stock->stock);
-            int waste_stack_size = get_stack_size(the_stock->waste);
+            int stock_stack_size = get_stack_size(solitaire->draw->stock);
+            int waste_stack_size = get_stack_size(solitaire->draw->waste);
             // card was not in tableau, check stack/waste
             if (waste_stack_size > 0 && 
-                get_value(the_stock->waste[waste_stack_size - 1]) == desired_value && 
-                get_suit(the_stock->waste[waste_stack_size - 1])  == desired_suit ) {
+                get_value(solitaire->draw->waste[waste_stack_size - 1]) == desired_value && 
+                 get_suit(solitaire->draw->waste[waste_stack_size - 1])  == desired_suit ) {
                 // waste has at least a card and
                 // desired card located in waste
-                to_foundations_move(the_stock->waste,the_foundations);
+                to_foundations_move(solitaire->draw->waste,solitaire->foundations);
                 skip = 1;
             }
             else if (stock_stack_size + waste_stack_size > 0) {
                 // draw stock and try again
-                draw_stock(the_stock);
+                draw_stock(solitaire->draw);
             }
             else {
                 // stock and waste are empty
@@ -517,20 +514,19 @@ void autocomplete(struct Klondike_Tableau * the_tableau, struct Klondike_Stock *
         }
         // post-move
         delay(AUTOCOMPLETE_INTERVAL);
-        display_klondike_interface(the_stock,the_foundations,the_tableau);
+        display_klondike(solitaire);
     }   
     return;
 }   
 int klondike(struct Deck * the_deck) {
     // initialize all stacks
     int victory = 0;
-    struct Klondike_Tableau * the_tableau = init_tableau(the_deck);
-    struct Klondike_Stock * the_stock = init_stock(the_deck);
-    struct Klondike_Foundations * the_foundations = init_foundations(); // initially empty, so it's not dependent on the deck
+    struct Klondike_Solitaire * solitaire;
+    solitaire = init_klondike(the_deck);
     int hidden = HIDDEN_CARDS_MAX;
     int revealed = 0;
     while (!victory) {
-        display_klondike_interface(the_stock,the_foundations,the_tableau);
+        display_klondike(solitaire);
         int source_stack;
         int source_position;
         int destination_stack;
@@ -549,7 +545,7 @@ int klondike(struct Deck * the_deck) {
         switch(move) {
             case 'S':
             case 's':
-                draw_stock(the_stock);
+                draw_stock(solitaire->draw);
                 break;
             case 'W':
             case 'w':
@@ -557,7 +553,7 @@ int klondike(struct Deck * the_deck) {
                 printf("\nTableau stack index: ");
                 scanf("%d",&tab_stack_index);
                 printf("\n");
-                waste_to_tableau_move(the_stock,&the_tableau->tab_stack[tab_stack_index]);
+                waste_to_tableau_move(solitaire->draw,&solitaire->tableau->tab_stack[tab_stack_index]);
                 break;
             case 'T':
             case 't':
@@ -572,9 +568,9 @@ int klondike(struct Deck * the_deck) {
                     printf("Integers were out of bounds. Please try again.\n Note that the tableau stacks are indexed 0-6, and the position must be 0-19\n");
                 }
                 else {
-                    revealed = the_tableau->tab_stack[source_stack].hidden_cards;
-                    intratabular_move(&the_tableau->tab_stack[source_stack],source_position,&the_tableau->tab_stack[destination_stack]);
-                    revealed -= the_tableau->tab_stack[source_stack].hidden_cards;
+                    revealed = solitaire->tableau->tab_stack[source_stack].hidden_cards;
+                    intratabular_move(&solitaire->tableau->tab_stack[source_stack],source_position,&solitaire->tableau->tab_stack[destination_stack]);
+                    revealed -= solitaire->tableau->tab_stack[source_stack].hidden_cards;
                     
                     hidden -= revealed;
                 }
@@ -585,7 +581,7 @@ int klondike(struct Deck * the_deck) {
                 printf("\nWaste or tableau? (W or T): ");
                 scanf("%s",&wort);
                 if (wort == 'w' || wort == 'W') {
-                    to_foundations_move(&the_stock->waste[get_stack_size(the_stock->waste)-1],the_foundations);
+                    to_foundations_move(&solitaire->draw->waste[get_stack_size(solitaire->draw->waste)-1],solitaire->foundations);
                 }
                 else if (wort == 't' || wort == 'T') {
                     printf("\nTableau stack index: ");
@@ -595,10 +591,10 @@ int klondike(struct Deck * the_deck) {
                         printf("Tableau stack index must be between 0 and 6.\n Please try again.\n");
                     }
                     else {
-                        revealed = the_tableau->tab_stack[tab_stack_index].hidden_cards;
-                        to_foundations_move(the_tableau->tab_stack[tab_stack_index].stack_card,the_foundations);
-                        flip_revealed_card(&the_tableau->tab_stack[tab_stack_index]);
-                        revealed -= the_tableau->tab_stack[tab_stack_index].hidden_cards;
+                        revealed = solitaire->tableau->tab_stack[tab_stack_index].hidden_cards;
+                        to_foundations_move(solitaire->tableau->tab_stack[tab_stack_index].stack_card,solitaire->foundations);
+                        flip_revealed_card(&solitaire->tableau->tab_stack[tab_stack_index]);
+                        revealed -= solitaire->tableau->tab_stack[tab_stack_index].hidden_cards;
                         hidden -= revealed;
                     }
                 }
@@ -609,12 +605,12 @@ int klondike(struct Deck * the_deck) {
                 scanf("%d",&peel_foundation);
                 printf("To which tableau stack? ");
                 scanf("%d", &peel_dest);
-                from_foundations_move(the_foundations,peel_foundation,&the_tableau->tab_stack[peel_dest]);
+                from_foundations_move(solitaire->foundations,peel_foundation,&solitaire->tableau->tab_stack[peel_dest]);
                 break;
             case 'A':
             case 'a':
                 if (hidden == 0) {
-                    autocomplete(the_tableau,the_stock,the_foundations);
+                    autocomplete(solitaire);
                 }
                 else {
                     printf("Autocomplete not available until there are no more hidden cards (XX).\n");
@@ -624,10 +620,10 @@ int klondike(struct Deck * the_deck) {
                 printf("Move not recognized. Try again\n");
                 break;
         }
-        if (the_foundations->stack[SUIT_HEARTS  ][FOUNDATIONS_STACK_MAX-1].value == VALUE_KING &&
-            the_foundations->stack[SUIT_SPADES  ][FOUNDATIONS_STACK_MAX-1].value == VALUE_KING &&
-            the_foundations->stack[SUIT_DIAMONDS][FOUNDATIONS_STACK_MAX-1].value == VALUE_KING &&
-            the_foundations->stack[SUIT_CLUBS   ][FOUNDATIONS_STACK_MAX-1].value == VALUE_KING   ) {
+        if (solitaire->foundations->stack[SUIT_HEARTS  ][FOUNDATIONS_STACK_MAX-1].value == VALUE_KING &&
+            solitaire->foundations->stack[SUIT_SPADES  ][FOUNDATIONS_STACK_MAX-1].value == VALUE_KING &&
+            solitaire->foundations->stack[SUIT_DIAMONDS][FOUNDATIONS_STACK_MAX-1].value == VALUE_KING &&
+            solitaire->foundations->stack[SUIT_CLUBS   ][FOUNDATIONS_STACK_MAX-1].value == VALUE_KING   ) {
                 victory = 1;
         }
     }
