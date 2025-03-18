@@ -255,7 +255,7 @@ void display_klondike(struct Klondike_Solitaire * solitaire) {
     int waste_stack_size = get_stack_size(solitaire->draw->waste);
     int waste_index = waste_stack_size - 1;
     if (waste_stack_size == 0) {
-        printf("    ");
+        printf(" [] ");
     }
     else {
         printf(" ");
@@ -309,7 +309,12 @@ void display_klondike(struct Klondike_Solitaire * solitaire) {
     for(j = largest_stack_size - 1; j >= 0; j--) { // TOP TO BOTTOM
         for(i = 0; i < TABLEAU_STACK_QUANTITY; i++) { // LEFT TO RIGHT
             if (solitaire->tableau->tab_stack[i].stack_card[j].value == 0) {
-                printf("    "); // no card at this level
+                if (j == 0) {
+                    printf(" [] ");
+                }
+                else {
+                    printf("    "); // no card at this level
+                }
             }
             else if ( (j >= solitaire->tableau->tab_stack[i].hidden_cards) || hide == 0 ) { // only display cards above the number of hidden cards
                 printf(" ");
